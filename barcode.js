@@ -2,6 +2,7 @@
 JavaScript file supporting a Barcode Scanning Inventory Process that Pulls Data from Alma API.
 
 Author: Terry Brady, Georgetown University Libraries
+Modified by: Alyssa Anderson, 2019 Summer Intern, ExxonMobil Upstream Library
 
 Dependencies
   1. JQuery UI Dialog:https://jqueryui.com/dialog/
@@ -48,12 +49,17 @@ var testArr = [];
 //Global counter to assign a unique id to every scan performed within a session
 var sr=1;
 
-//Other colors Anna has: kelly green, grey, goldenrod
+//This section assigns the color-coded legend. Statuses correspond with buttons defined in barcodeReport.html.
+//For color names: https://www.w3schools.com/tags/ref_colornames.asp
 var STAT_FAIL = "FAIL";
 var COLORMAP = [
   {status: "PASS",       color: "white",        nickname: "white",           desc: "Information is valid.  No action required."},
   {status: STAT_FAIL,    color: "pink",         nickname: "pink",            desc: "Retrieval failed.  Try to refresh again.  File a ticket with LIT if the issue persists."},
   {status: "NOT-FOUND",  color: "coral",        nickname: "red",             desc: "No Alma data for barcode.  Attach flag and pull item."},
+  {status: "PULL-NFG",   color: "powderblue",   nickname: "powderblue",      desc: "Needs file guide.  Attach flag and pull item."},
+  {status: "PULL-NNB",   color: "plum",         nickname: "plum",            desc: "Needs new binding.  Attach flag and pull item."},
+  {status: "PULL-NFB",   color: "cyan",         nickname: "cyan",            desc: "Needs new file guide and binding.  Attach flag and pull item."},
+//{status: "PULL-CNL",   color: "khaki",        nickname: "khaki",           desc: "Needs call number label.  Attach flag and pull item."},
   {status: "META-CALL",  color: "darkorange",   nickname: "electric orange", desc: "Bad Call Number.  Attach flag and send to Metadata Services for correction."},
   {status: "META-TTL",   color: "lightskyblue", nickname: "blue",            desc: "Bad Title.  Attach flag and send to Metadata Services for correction."},
   {status: "META-VOL",   color: "lightgreen",   nickname: "mint green",      desc: "Bad Volume.  Attach flag and send to Metadata Services for correction."},
@@ -200,7 +206,8 @@ function bindEvents() {
   $("#barcode").on("change", function(){valBarcode()});
 
   //Activate export to Google Sheets function
-  $("#exportGsheet").on("click", function(){
+  //Simple csv export option via https://github.com/Georgetown-University-Libraries/AlmaInventory/commit/595bb225df71cfc0e723ca0d68d12455a7745f9d#diff-ec8a88a0de004c850512332edef57abb
+  $("#exportCSV").on("click", function(){
     var cnt = $("tr.datarow").length;
     if (cnt == 0) {
       var msg = $("<div>There is no data to export.  Please scan some barcodes</div>");
@@ -210,21 +217,13 @@ function bindEvents() {
       return;
     }
 
-    var folderid = $("#mode").val() == "PROD" ? gsheet.props.folderid : gsheet.props.folderidtest;
-    var ssname = makeSpreadsheetName();
     var nodes = $("#restable tr");
-    var buf = ssname + "\n" + $("#user").val() + "\n" + gsheet.makeCsv(nodes);
-    /*
-    $.ajax({
-      type: "PUT",
-      url: "barcodeReportLog.php",
-      dataType: "text",
-      data: buf
-    })
-    */
-
-    gsheet.gsheet(nodes, ssname, folderid);
-    var msg = $("<div>Please confirm that <b>"+cnt+"</b> barcodes were successfully exported and saved to Google sheets.Click <b>OK</b> delete those barcodes from this page.</div>");
+    var itemdata = "data:text/csv;charset=utf-8," + gsheet.makeCsv(nodes);
+    var encodedUri = encodeURI(itemdata);
+        console.log(itemdata);
+    window.open(encodedUri);
+        //console.log(encodedUri);
+    var msg = $("<div>Please confirm that <b>"+cnt+"</b> barcodes were successfully exported and saved to file. Click <b>OK</b> to delete those barcodes from this page.</div>");
     mydialog("Clear Barcode Table?", msg, function() {
       $("tr.datarow").remove();
       autosave();
@@ -411,12 +410,13 @@ function addBarcode(barcode, show) {
   tr.append($("<td class='title'/>"));
   tr.append($("<td class='process'/>"));
   tr.append($("<td class='temp_location'/>"));
-  tr.append($("<td class='bib_supp'/>"));
-  tr.append($("<td class='hold_supp'/>"));
+  //tr.append($("<td class='bib_supp'/>"));
+  //tr.append($("<td class='hold_supp'/>"));
   tr.append($("<td class='record_num'/>"));
   tr.append($("<td class='status'/>"));
   tr.append($("<td class='status_msg'/>"));
   tr.append($("<td class='timestamp'/>"));
+  tr.append($("<td class='bib_id'/>"));
   $("#restable tr.header").after(tr);
   processCodes(show);
 }
@@ -452,9 +452,10 @@ function getButtonCell() {
 
 function restoreRow(rowarr) {
     if (rowarr == null) return;
-    if (rowarr.length != 13) {
-      return;
-    }
+    
+    //if (rowarr.length != 13) {
+    //  return;
+    //}
 
     var barcode = rowarr.shift();
     var tr = getNewRow(false, barcode);
@@ -464,12 +465,13 @@ function restoreRow(rowarr) {
     tr.append($("<td class='title'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='process'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='temp_location'>" + rowarr.shift() + "</td>"));
-    tr.append($("<td class='bib_supp'>" + rowarr.shift() + "</td>"));
-    tr.append($("<td class='hold_supp'>" + rowarr.shift() + "</td>"));
+    //tr.append($("<td class='bib_supp'>" + rowarr.shift() + "</td>"));
+    //tr.append($("<td class='hold_supp'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='record_num'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='status'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='status_msg'>" + rowarr.shift() + "</td>"));
     tr.append($("<td class='timestamp'>" + rowarr.shift() + "</td>"));
+    tr.append($("<td class='bib_id'>" + rowarr.shift() + "</td>"));
     tr.addClass(tr.find("td.status").text());
     $("#restable tr.header").after(tr);
     setLcSortStat(tr);
@@ -532,7 +534,7 @@ function updateRowStat(tr) {
 
 
 function getBarcodeFromUrl(url) {
-  var match = /.*item_barcode=([0-9\-]+)$/.exec(url);
+  var match = /.*item_barcode=([A-Z0-9\-]+)$/.exec(url);
   return (match.length > 1) ? match[1] : "";
 }
 
@@ -581,7 +583,7 @@ function parseResponse(barcode, json) {
     var status_msg = "Barcode Found. ";
     var bibData = getArray(json, "bib_data");
     var bibLink = getValue(bibData, "link");
-
+    var mms_id = getValue(bibData, "mms_id");
     var holdingData = getArray(json, "holding_data");
     var holdingLink = getValue(holdingData, "link");
     var itemData = getArray(json, "item_data");
@@ -636,6 +638,7 @@ function parseResponse(barcode, json) {
 
     resdata = {
       "barcode"       : barcode,
+      "mms_id"        : getValue(bibData, "mms_id"),
       "bib_id"        : getValue(bibData, "mms_id"),
       "holding_id"    : getValue(holdingData, "holding_id"),
       "record_num"    : getValue(itemData, "pid"),
@@ -683,6 +686,7 @@ function processCodes(show) {
   //Call the web service to get data for the barcode
   var url = API_REDIRECT + "?apipath="+encodeURIComponent(API_SERVICE)+"items&item_barcode="+barcode;
   $.getJSON(url, function(rawdata){
+      console.log(rawdata)
     var data = parseResponse(getBarcodeFromUrl(this.url), rawdata);
     var resbarcode = data["barcode"];
     var tr = $("#restable tr[barcode="+resbarcode+"]");
@@ -690,8 +694,9 @@ function processCodes(show) {
       var val = data[key] == null ? "" : data[key];
       if (key == "bibLink" || key == "holdingLink") {
         continue;
-      } else if (key == "bib_id" || key == "holding_id") {
-        tr.attr(key, val);
+     // } else if (key == "bib_id" || key == "holding_id") {
+     //     console.log(key,val,resbarcode)
+     //   tr.attr(key, val);
       } else {
         tr.find("td."+key).text(val);
       }
