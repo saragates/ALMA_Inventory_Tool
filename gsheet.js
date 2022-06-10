@@ -70,7 +70,7 @@ var GSheet = function(proppath) {
         return data;
     }
 
-    //adding a replace for # in titles using https://github.com/Georgetown-University-Libraries/AlmaInventory/pull/14/commits/e13fde7b435943da4b2f144f947a5ae881df1185 
+      //adding a replace for # in titles using https://github.com/Georgetown-University-Libraries/AlmaInventory/pull/14/commits/e13fde7b435943da4b2f144f947a5ae881df1185 
     this.exportCell = function(col) {
         data = "\"";
         $(col).contents().each(function(i, node){
